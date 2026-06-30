@@ -1,0 +1,17 @@
+{
+  "name": "empirical-x402-api",
+  "version": "1.0.0",
+  "description": "x402-monetized API for Peptide OS and Stacked Goods data, by Empirical OS LLC",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "x402-express": "^0.5.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  }
+}
