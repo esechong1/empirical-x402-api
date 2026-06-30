@@ -1,5 +1,7 @@
 import express from "express";
-import { paymentMiddleware } from "x402-express";
+import { paymentMiddleware } from "@x402/express";
+import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
+import { registerExactEvmScheme } from "@x402/evm/exact/server";
 import cors from "cors";
 import dotenv from "dotenv";
 import { getPeptide, listPeptides } from "./peptideData.js";
@@ -13,13 +15,17 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 const PAY_TO = process.env.WALLET_ADDRESS;
-const NETWORK = process.env.X402_NETWORK || "base-sepolia";
+const NETWORK = process.env.X402_NETWORK_CAIP2 || "eip155:84532";
 const FACILITATOR_URL = process.env.X402_FACILITATOR_URL || "https://x402.org/facilitator";
 
 if (!PAY_TO) {
   console.error("Missing WALLET_ADDRESS in environment variables. Set it in .env or Vercel env vars.");
   process.exit(1);
 }
+
+const facilitatorClient = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
+const resourceServer = new x402ResourceServer(facilitatorClient);
+registerExactEvmScheme(resourceServer);
 
 app.get("/", (req, res) => {
   res.json({
@@ -42,26 +48,37 @@ app.get("/api/stacks", (req, res) => {
   res.json({ available: listStacks() });
 });
 
-app.use(paymentMiddleware(
-  PAY_TO,
-  {
-    "GET /api/peptide/:slug": {
-      price: "$0.01",
-      network: NETWORK,
-      config: {
-        description: "Research peptide protocol data: mechanism, dosing, reconstitution, administration route"
+app.use(
+  paymentMiddleware(
+    {
+      "GET /api/peptide/:slug": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.01",
+            network: NETWORK,
+            payTo: PAY_TO
+          }
+        ],
+        description: "Research peptide protocol data: mechanism, dosing, reconstitution, administration route",
+        mimeType: "application/json"
+      },
+      "GET /api/stack/:goal": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.01",
+            network: NETWORK,
+            payTo: PAY_TO
+          }
+        ],
+        description: "Supplement stack recommendation with mechanisms and dosing for a stated goal",
+        mimeType: "application/json"
       }
     },
-    "GET /api/stack/:goal": {
-      price: "$0.01",
-      network: NETWORK,
-      config: {
-        description: "Supplement stack recommendation with mechanisms and dosing for a stated goal"
-      }
-    }
-  },
-  { url: FACILITATOR_URL }
-));
+    resourceServer
+  )
+);
 
 app.get("/api/peptide/:slug", (req, res) => {
   const data = getPeptide(req.params.slug);
